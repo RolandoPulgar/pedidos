@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedidos Gcrea</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        input:focus, select:focus {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app" class="min-h-screen p-4">
+        <div class="max-w-7xl mx-auto">
+            <!-- Header -->
+            <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+                <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                    <div class="flex items-center gap-4">
+                        <img src="logo-gcrea.png" alt="Gcrea Logo" class="h-16 w-auto" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div style="display:none" class="text-orange-500 font-bold text-3xl">GCREA</div>
+                        <h1 class="text-2xl font-bold text-gray-800">Pedidos Gcrea</h1>
+                    </div>
+                    <div class="flex gap-2 flex-wrap">
+                        <button onclick="toggleConfig()" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600">
+                            ⚙️ Configurar
+                        </button>
+                        <button onclick="loadFromSheets()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                            📥 Cargar
+                        </button>
+                        <button onclick="saveToSheets()" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
+                            💾 Guardar
+                        </button>
+                        <button onclick="exportData()" class="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600">
+                            📦 Backup
+                        </button>
+                        <label class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 cursor-pointer">
+                            📤 Restaurar
+                            <input type="file" accept=".json" onchange="importData(event)" class="hidden">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Config Panel -->
+                <div id="configPanel" style="display:none" class="mb-4 p-4 bg-purple-50 border border-purple-200 rounded">
+                    <h3 class="font-semibold mb-2">Configuración de Google Sheets</h3>
+                    <div class="flex gap-2">
+                        <input id="sheetUrlInput" type="text" placeholder="Pega aquí la URL de tu Google Apps Script" class="flex-1 p-2 border rounded">
+                        <button onclick="saveSheetUrl()" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600">
+                            Guardar URL
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-600 mt-2">
+                        📝 Debe ser la URL de implementación de tu Google Apps Script (termina en /exec)
+                    </p>
+                </div>
+
+                <!-- Sync Status -->
+                <div id="syncStatus" style="display:none" class="mb-4 text-sm text-gray-600 bg-green-50 p-2 rounded"></div>
+
+                <!-- Search and Add -->
+                <div class="flex gap-4">
+                    <input id="searchInput" type="text" placeholder="Buscar por número, nombre o teléfono..." 
+                           class="flex-1 p-2 border rounded" onkeyup="filterOrders()">
+                    <button onclick="addOrder()" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
+                        ➕ Nuevo Pedido
+                    </button>
+                </div>
+            </div>
+
+            <!-- Active Orders -->
+            <div class="bg-white rounded-lg shadow-md mb-4">
+                <div class="p-4 bg-blue-500 text-white rounded-t-lg flex justify-between items-center">
+                    <h2 class="text-xl font-semibold">Pedidos Activos (<span id="activeCount">0</span>)</h2>
+                    <div class="text-lg font-bold">
+                        Total: <span id="activeTotal">$0</span>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="p-2 text-left text-xs">N° Pedido</th>
+                                <th class="p-2 text-left text-xs">Valor</th>
+                                <th class="p-2 text-left text-xs">Prioridad</th>
+                                <th class="p-2 text-left text-xs">Nombre</th>
+                                <th class="p-2 text-left text-xs">Estado</th>
+                                <th class="p-2 text-left text-xs">Fecha Fin.</th>
+                                <th class="p-2 text-left text-xs">Tipo Entrega</th>
+                                <th class="p-2 text-left text-xs">Teléfono</th>
+                                <th class="p-2 text-left text-xs">Lugar</th>
+                                <th class="p-2 text-left text-xs">Notas</th>
+                                <th class="p-2 text-left text-xs">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activeOrdersBody"></tbody>
+                    </table>
+                    <div id="noActiveOrders" style="display:none" class="p-8 text-center text-gray-500">
+                        No hay pedidos activos
+                    </div>
+                </div>
+            </div>
+
+            <!-- Delivered Orders -->
+            <div class="bg-white rounded-lg shadow-md">
+                <button onclick="toggleDelivered()" class="w-full p-4 bg-purple-500 text-white rounded-t-lg flex justify-between items-center hover:bg-purple-600">
+                    <div class="flex items-center gap-4">
+                        <h2 class="text-xl font-semibold">Pedidos Entregados (<span id="deliveredCount">0</span>)</h2>
+                        <span class="text-lg font-bold">Total: <span id="deliveredTotal">$0</span></span>
+                    </div>
+                    <span id="deliveredToggle">▼</span>
+                </button>
+                <div id="deliveredSection" style="display:none">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="p-2 text-left text-xs">N° Pedido</th>
+                                    <th class="p-2 text-left text-xs">Valor</th>
+                                    <th class="p-2 text-left text-xs">Prioridad</th>
+                                    <th class="p-2 text-left text-xs">Nombre</th>
+                                    <th class="p-2 text-left text-xs">Estado</th>
+                                    <th class="p-2 text-left text-xs">Fecha Fin.</th>
+                                    <th class="p-2 text-left text-xs">Tipo Entrega</th>
+                                    <th class="p-2 text-left text-xs">Teléfono</th>
+                                    <th class="p-2 text-left text-xs">Lugar</th>
+                                    <th class="p-2 text-left text-xs">Notas</th>
+                                    <th class="p-2 text-left text-xs">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deliveredOrdersBody"></tbody>
+                        </table>
+                        <div id="noDeliveredOrders" style="display:none" class="p-8 text-center text-gray-500">
+                            No hay pedidos entregados
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="mt-4 text-right">
+                <span class="text-xs text-gray-500">v22</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let activeOrders = [];
+        let deliveredOrders = [];
+        let sheetUrl = '';
+        let currentMonth = '';
+
+        // Initialize
+        function init() {
+            currentMonth = getCurrentMonthName();
+            document.getElementById('currentMonth').textContent = currentMonth;
+            
+            // Load config
+            const savedUrl = localStorage.getItem('googleSheetUrl');
+            if (savedUrl) {
+                sheetUrl = savedUrl;
+                document.getElementById('sheetUrlInput').value = savedUrl;
+            }
+            
+            // Load orders
+            const savedActive = localStorage.getItem(`activeOrders_${currentMonth}`);
+            const savedDelivered = localStorage.getItem(`deliveredOrders_${currentMonth}`);
+            
+            if (savedActive) activeOrders = JSON.parse(savedActive);
+            if (savedDelivered) deliveredOrders = JSON.parse(savedDelivered);
+            
+            renderOrders();
+        }
+
+        function getCurrentMonthName() {
+            const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                           'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            const date = new Date();
+            return `${months[date.getMonth()]}_${date.getFullYear()}`;
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem(`activeOrders_${currentMonth}`, JSON.stringify(activeOrders));
+            localStorage.setItem(`deliveredOrders_${currentMonth}`, JSON.stringify(deliveredOrders));
+        }
+
+        function addOrder() {
+            const newOrder = {
+                id: Date.now() + Math.random(),
+                numero: '',
+                valor: '',
+                prioridad: 'Normal',
+                nombre: '',
+                estado: 'No iniciada',
+                fechaFinalizacion: '',
+                tipoEntrega: 'La Cisterna',
+                telefono: '',
+                lugar: '',
+                notas: ''
+            };
+            activeOrders.unshift(newOrder);
+            saveToLocalStorage();
+            renderOrders();
+        }
+
+        function updateOrder(id, field, value, isDelivered) {
+            const orders = isDelivered ? deliveredOrders : activeOrders;
+            const order = orders.find(o => o.id === id);
+            if (order) {
+                order[field] = value;
+                saveToLocalStorage();
+                updateTotals();
+            }
+        }
+
+        function deleteOrder(id, isDelivered) {
+            if (confirm('¿Eliminar este pedido?')) {
+                if (isDelivered) {
+                    deliveredOrders = deliveredOrders.filter(o => o.id !== id);
+                } else {
+                    activeOrders = activeOrders.filter(o => o.id !== id);
+                }
+                saveToLocalStorage();
+                renderOrders();
+            }
+        }
+
+        function markAsDelivered(id) {
+            const order = activeOrders.find(o => o.id === id);
+            if (order) {
+                order.estado = 'Entregado';
+                order.fechaEntrega = new Date().toLocaleDateString('es-CL');
+                deliveredOrders.unshift(order);
+                activeOrders = activeOrders.filter(o => o.id !== id);
+                saveToLocalStorage();
+                renderOrders();
+            }
+        }
+
+        function moveToActive(id) {
+            const order = deliveredOrders.find(o => o.id === id);
+            if (order) {
+                delete order.fechaEntrega;
+                activeOrders.unshift(order);
+                deliveredOrders = deliveredOrders.filter(o => o.id !== id);
+                saveToLocalStorage();
+                renderOrders();
+            }
+        }
+
+        function getPriorityColor(prioridad) {
+            const colors = {
+                'Rápida': 'bg-red-100 text-red-800',
+                'Normal': 'bg-green-100 text-green-800',
+                'Baja': 'bg-gray-100 text-gray-800'
+            };
+            return colors[prioridad] || colors['Normal'];
+        }
+
+        function getStatusColor(estado) {
+            const colors = {
+                'No iniciada': 'bg-blue-100 text-blue-800',
+                'En proceso': 'bg-yellow-100 text-yellow-800',
+                'Completado': 'bg-green-100 text-green-800',
+                'Entregado': 'bg-purple-100 text-purple-800'
+            };
+            return colors[estado] || colors['No iniciada'];
+        }
+
+        function calculateTotal(orders) {
+            return orders.reduce((sum, order) => {
+                const value = parseFloat(order.valor.replace(/[^0-9.-]/g, '') || 0);
+                return sum + value;
+            }, 0);
+        }
+
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('es-CL', {
+                style: 'currency',
+                currency: 'CLP',
+                minimumFractionDigits: 0
+            }).format(value);
+        }
+
+        function updateTotals() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            const filteredActive = activeOrders.filter(o => 
+                o.numero?.toString().includes(searchTerm) ||
+                o.nombre?.toLowerCase().includes(searchTerm) ||
+                o.telefono?.includes(searchTerm)
+            );
+            
+            const filteredDelivered = deliveredOrders.filter(o => 
+                o.numero?.toString().includes(searchTerm) ||
+                o.nombre?.toLowerCase().includes(searchTerm)
+            );
+            
+            document.getElementById('activeCount').textContent = filteredActive.length;
+            document.getElementById('activeTotal').textContent = formatCurrency(calculateTotal(filteredActive));
+            document.getElementById('deliveredCount').textContent = filteredDelivered.length;
+            document.getElementById('deliveredTotal').textContent = formatCurrency(calculateTotal(filteredDelivered));
+        }
+
+        function createOrderRow(order, isDelivered) {
+            return `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-2">
+                        <input class="w-20 p-2 border rounded text-sm text-center" 
+                               value="${order.numero || ''}" 
+                               onchange="updateOrder(${order.id}, 'numero', this.value, ${isDelivered})"
+                               placeholder="####">
+                    </td>
+                    <td class="p-2">
+                        <input class="w-20 p-1 border rounded text-sm" 
+                               value="${order.valor || ''}" 
+                               onchange="updateOrder(${order.id}, 'valor', this.value, ${isDelivered})"
+                               placeholder="$0">
+                    </td>
+                    <td class="p-2">
+                        <select class="w-20 p-1 rounded text-xs font-medium ${getPriorityColor(order.prioridad)}" 
+                                onchange="updateOrder(${order.id}, 'prioridad', this.value, ${isDelivered}); renderOrders()">
+                            <option ${order.prioridad === 'Rápida' ? 'selected' : ''}>Rápida</option>
+                            <option ${order.prioridad === 'Normal' ? 'selected' : ''}>Normal</option>
+                            <option ${order.prioridad === 'Baja' ? 'selected' : ''}>Baja</option>
+                        </select>
+                    </td>
+                    <td class="p-2">
+                        <input class="w-24 p-1 border rounded text-sm" 
+                               value="${order.nombre || ''}" 
+                               onchange="updateOrder(${order.id}, 'nombre', this.value, ${isDelivered})"
+                               placeholder="Nombre">
+                    </td>
+                    <td class="p-2">
+                        <select class="w-24 p-1 rounded text-xs font-medium ${getStatusColor(order.estado)}" 
+                                onchange="updateOrder(${order.id}, 'estado', this.value, ${isDelivered}); renderOrders()">
+                            <option ${order.estado === 'No iniciada' ? 'selected' : ''}>No iniciada</option>
+                            <option ${order.estado === 'En proceso' ? 'selected' : ''}>En proceso</option>
+                            <option ${order.estado === 'Completado' ? 'selected' : ''}>Completado</option>
+                        </select>
+                    </td>
+                    <td class="p-2">
+                        <input type="date" class="w-28 p-1 border rounded text-xs" 
+                               value="${order.fechaFinalizacion || ''}" 
+                               onchange="updateOrder(${order.id}, 'fechaFinalizacion', this.value, ${isDelivered})">
+                    </td>
+                    <td class="p-2">
+                        <select class="w-28 p-1 border rounded text-xs" 
+                                onchange="updateOrder(${order.id}, 'tipoEntrega', this.value, ${isDelivered})">
+                            <option ${order.tipoEntrega === 'La Cisterna' ? 'selected' : ''}>La Cisterna</option>
+                            <option ${order.tipoEntrega === 'Puente Alto' ? 'selected' : ''}>Puente Alto</option>
+                            <option ${order.tipoEntrega === 'Envío' ? 'selected' : ''}>Envío</option>
+                        </select>
+                    </td>
+                    <td class="p-2">
+                        <input class="w-20 p-1 border rounded text-sm" 
+                               value="${order.telefono || ''}" 
+                               onchange="updateOrder(${order.id}, 'telefono', this.value, ${isDelivered})"
+                               placeholder="##">
+                    </td>
+                    <td class="p-2">
+                        <input class="w-20 p-1 border rounded text-sm" 
+                               value="${order.lugar || ''}" 
+                               onchange="updateOrder(${order.id}, 'lugar', this.value, ${isDelivered})"
+                               placeholder="Lugar">
+                    </td>
+                    <td class="p-2">
+                        <input class="w-24 p-1 border rounded text-sm" 
+                               value="${order.notas || ''}" 
+                               onchange="updateOrder(${order.id}, 'notas', this.value, ${isDelivered})"
+                               placeholder="Notas">
+                    </td>
+                    <td class="p-2">
+                        <div class="flex gap-1">
+                            ${!isDelivered ? `
+                                <button onclick="markAsDelivered(${order.id})" 
+                                        class="p-1 bg-green-500 text-white rounded hover:bg-green-600" 
+                                        title="Marcar como entregado">✓</button>
+                            ` : `
+                                <button onclick="moveToActive(${order.id})" 
+                                        class="p-1 bg-blue-500 text-white rounded hover:bg-blue-600" 
+                                        title="Volver a activos">↑</button>
+                            `}
+                            <button onclick="deleteOrder(${order.id}, ${isDelivered})" 
+                                    class="p-1 bg-red-500 text-white rounded hover:bg-red-600" 
+                                    title="Eliminar">✕</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        function renderOrders() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            const filteredActive = activeOrders.filter(o => 
+                o.numero?.toString().includes(searchTerm) ||
+                o.nombre?.toLowerCase().includes(searchTerm) ||
+                o.telefono?.includes(searchTerm)
+            );
+            
+            const filteredDelivered = deliveredOrders.filter(o => 
+                o.numero?.toString().includes(searchTerm) ||
+                o.nombre?.toLowerCase().includes(searchTerm)
+            );
+            
+            // Render active
+            const activeBody = document.getElementById('activeOrdersBody');
+            if (filteredActive.length === 0) {
+                activeBody.innerHTML = '';
+                document.getElementById('noActiveOrders').style.display = 'block';
+            } else {
+                activeBody.innerHTML = filteredActive.map(o => createOrderRow(o, false)).join('');
+                document.getElementById('noActiveOrders').style.display = 'none';
+            }
+            
+            // Render delivered
+            const deliveredBody = document.getElementById('deliveredOrdersBody');
+            if (filteredDelivered.length === 0) {
+                deliveredBody.innerHTML = '';
+                document.getElementById('noDeliveredOrders').style.display = 'block';
+            } else {
+                deliveredBody.innerHTML = filteredDelivered.map(o => createOrderRow(o, true)).join('');
+                document.getElementById('noDeliveredOrders').style.display = 'none';
+            }
+            
+            updateTotals();
+        }
+
+        function filterOrders() {
+            renderOrders();
+        }
+
+        function toggleDelivered() {
+            const section = document.getElementById('deliveredSection');
+            const toggle = document.getElementById('deliveredToggle');
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                toggle.textContent = '▲';
+            } else {
+                section.style.display = 'none';
+                toggle.textContent = '▼';
+            }
+        }
+
+        function toggleConfig() {
+            const panel = document.getElementById('configPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function saveSheetUrl() {
+            const url = document.getElementById('sheetUrlInput').value.trim();
+            if (url) {
+                localStorage.setItem('googleSheetUrl', url);
+                sheetUrl = url;
+                document.getElementById('configPanel').style.display = 'none';
+                alert('URL de Google Sheets configurada correctamente');
+            }
+        }
+
+        async function loadFromSheets() {
+            if (!sheetUrl) {
+                alert('Por favor configura la URL de Google Sheets primero');
+                toggleConfig();
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${sheetUrl}?action=getAll&month=${currentMonth}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    activeOrders = data.activeOrders || [];
+                    deliveredOrders = data.deliveredOrders || [];
+                    saveToLocalStorage();
+                    renderOrders();
+                    
+                    const status = document.getElementById('syncStatus');
+                    status.textContent = `✅ Datos cargados desde Google Sheets (${currentMonth}) - ${new Date().toLocaleString('es-CL')}`;
+                    status.style.display = 'block';
+                    
+                    alert(`Datos cargados desde Google Sheets (${currentMonth})`);
+                } else {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+            } catch (error) {
+                alert('Error al cargar desde Google Sheets: ' + error.message);
+            }
+        }
+
+        async function saveToSheets() {
+            if (!sheetUrl) {
+                alert('Por favor configura la URL de Google Sheets primero');
+                toggleConfig();
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${sheetUrl}?action=saveAll&month=${currentMonth}`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        activeOrders,
+                        deliveredOrders,
+                        month: currentMonth
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const status = document.getElementById('syncStatus');
+                    status.textContent = `✅ Datos guardados en Google Sheets (${currentMonth}) - ${new Date().toLocaleString('es-CL')}`;
+                    status.style.display = 'block';
+                    
+                    alert(`Datos guardados en Google Sheets (${currentMonth})`);
+                } else {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+            } catch (error) {
+                alert('Error al guardar en Google Sheets: ' + error.message);
+            }
+        }
+
+        function exportData() {
+            const data = {
+                activeOrders,
+                deliveredOrders,
+                month: currentMonth,
+                exportDate: new Date().toISOString()
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `pedidos_${currentMonth}_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (data.activeOrders) activeOrders = data.activeOrders;
+                        if (data.deliveredOrders) deliveredOrders = data.deliveredOrders;
+                        saveToLocalStorage();
+                        renderOrders();
+                        alert('Datos importados correctamente');
+                    } catch (error) {
+                        alert('Error al importar datos: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // Initialize on load
+        window.onload = init;
+    </script>
+</body>
+</html>
