@@ -3,176 +3,510 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pedidos Gcrea</title>
+    <title>Pedidos Gcrea | Sistema de Gestión</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        input:focus, select:focus {
-            outline: 2px solid #3b82f6;
-            outline-offset: 2px;
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        /* Toast notification */
+        #toastContainer {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .toast {
+            animation: slideIn 0.25s ease-out forwards;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
     </style>
 </head>
-<body class="bg-gray-50">
-    <div id="app" class="min-h-screen p-4">
-        <div class="max-w-7xl mx-auto">
-            <!-- Header -->
-            <div class="bg-white rounded-lg shadow-md p-4 mb-4">
-                <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
-                    <div class="flex items-center gap-4">
-                        <img src="logo-gcrea.png" alt="Gcrea Logo" class="h-16 w-auto" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                        <div style="display:none" class="text-orange-500 font-bold text-3xl">GCREA</div>
-                        <h1 class="text-2xl font-bold text-gray-800">Pedidos Gcrea</h1>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Toast Notifications Container -->
+    <div id="toastContainer"></div>
+
+    <!-- Header & App Bar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div class="flex items-center justify-between gap-4 flex-wrap">
+                <!-- Brand / Logo -->
+                <div class="flex items-center gap-3">
+                    <img src="logo-gcrea.png" alt="Gcrea Logo" class="h-10 w-auto object-contain rounded" 
+                         onerror="this.style.display='none'; document.getElementById('logoFallback').style.display='flex';">
+                    <div id="logoFallback" style="display:none;" class="h-10 w-10 bg-gradient-to-tr from-brand-600 to-orange-400 rounded-xl items-center justify-center text-white font-black text-xl shadow-sm">
+                        G
                     </div>
-                    <div class="flex gap-2 flex-wrap">
-                        <button onclick="toggleConfig()" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600">
-                            ⚙️ Configurar
-                        </button>
-                        <button onclick="loadFromSheets()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-                            📥 Cargar
-                        </button>
-                        <button onclick="saveToSheets()" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
-                            💾 Guardar
-                        </button>
-                        <button onclick="exportData()" class="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600">
-                            📦 Backup
-                        </button>
-                        <label class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 cursor-pointer">
-                            📤 Restaurar
-                            <input type="file" accept=".json" onchange="importData(event)" class="hidden">
-                        </label>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-lg font-bold text-slate-900 tracking-tight">Pedidos Gcrea</h1>
+                            <span id="monthBadge" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-brand-700 border border-orange-200">
+                                Cargando...
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500 font-medium">Gestión y Sincronización con Google Sheets</p>
                     </div>
                 </div>
 
-                <!-- Config Panel -->
-                <div id="configPanel" style="display:none" class="mb-4 p-4 bg-purple-50 border border-purple-200 rounded">
-                    <h3 class="font-semibold mb-2">Configuración de Google Sheets</h3>
-                    <div class="flex gap-2">
-                        <input id="sheetUrlInput" type="text" placeholder="Pega aquí la URL de tu Google Apps Script" class="flex-1 p-2 border rounded">
-                        <button onclick="saveSheetUrl()" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600">
-                            Guardar URL
-                        </button>
-                    </div>
-                    <p class="text-xs text-gray-600 mt-2">
-                        📝 Debe ser la URL de implementación de tu Google Apps Script (termina en /exec)
-                    </p>
-                </div>
-
-                <!-- Sync Status -->
-                <div id="syncStatus" style="display:none" class="mb-4 text-sm text-gray-600 bg-green-50 p-2 rounded"></div>
-
-                <!-- Search and Add -->
-                <div class="flex gap-4">
-                    <input id="searchInput" type="text" placeholder="Buscar por número, nombre o teléfono..." 
-                           class="flex-1 p-2 border rounded" onkeyup="filterOrders()">
-                    <button onclick="addOrder()" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
-                        ➕ Nuevo Pedido
+                <!-- Sync & Main Action Toolbar -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button onclick="loadFromSheets()" class="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition active:scale-95" title="Cargar datos de Google Sheets">
+                        <i data-lucide="cloud-download" class="w-4 h-4"></i>
+                        <span>Cargar</span>
+                    </button>
+                    <button onclick="saveToSheets()" class="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition active:scale-95" title="Guardar cambios en Google Sheets">
+                        <i data-lucide="cloud-upload" class="w-4 h-4"></i>
+                        <span>Guardar</span>
+                    </button>
+                    <button onclick="toggleConfig()" class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 transition" title="Configurar conexión Google Apps Script">
+                        <i data-lucide="settings" class="w-4 h-4"></i>
+                        <span class="hidden sm:inline">Ajustes</span>
+                    </button>
+                    <button onclick="exportData()" class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 transition" title="Descargar copia de seguridad JSON">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        <span class="hidden sm:inline">Backup</span>
+                    </button>
+                    <label class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 transition cursor-pointer" title="Restaurar backup JSON">
+                        <i data-lucide="upload" class="w-4 h-4"></i>
+                        <span class="hidden sm:inline">Restaurar</span>
+                        <input type="file" accept=".json" onchange="importData(event)" class="hidden">
+                    </label>
+                    <button onclick="openNewOrderModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95 ml-1">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span>Nuevo Pedido</span>
                     </button>
                 </div>
             </div>
 
-            <!-- Active Orders -->
-            <div class="bg-white rounded-lg shadow-md mb-4">
-                <div class="p-4 bg-blue-500 text-white rounded-t-lg flex justify-between items-center">
-                    <h2 class="text-xl font-semibold">Pedidos Activos (<span id="activeCount">0</span>)</h2>
-                    <div class="text-lg font-bold">
-                        Total: <span id="activeTotal">$0</span>
+            <!-- Google Sheets Configuration Drawer (Collapsible) -->
+            <div id="configPanel" style="display:none;" class="mt-3 p-4 bg-purple-50/80 border border-purple-200 rounded-xl transition-all">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2 text-purple-900 font-bold text-sm">
+                        <i data-lucide="link" class="w-4 h-4"></i>
+                        <span>Conexión con Google Sheets (Google Apps Script)</span>
+                    </div>
+                    <button onclick="toggleConfig()" class="text-purple-400 hover:text-purple-700">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <div class="flex gap-2 flex-col sm:flex-row">
+                    <input id="sheetUrlInput" type="text" placeholder="https://script.google.com/macros/s/.../exec" 
+                           class="flex-1 px-3 py-2 text-sm bg-white border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <button onclick="saveSheetUrl()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
+                        Guardar Conexión
+                    </button>
+                </div>
+                <p class="text-xs text-purple-700 mt-2 flex items-center gap-1">
+                    <i data-lucide="info" class="w-3.5 h-3.5 inline"></i>
+                    Pega aquí la URL de la aplicación web de tu Apps Script implementado con acceso anónimo o público.
+                </p>
+            </div>
+
+            <!-- Sync Alert Status Banner -->
+            <div id="syncStatus" style="display:none;" class="mt-2 py-1.5 px-3 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-2">
+                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span id="syncStatusText"></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+        <!-- KPI Metrics & Summary Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <!-- Activos -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                <div class="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                    <span>Activos</span>
+                    <span class="p-1.5 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="clock" class="w-4 h-4"></i></span>
+                </div>
+                <div class="mt-2">
+                    <div id="kpiActiveCount" class="text-2xl font-extrabold text-slate-900">0</div>
+                    <div id="kpiActiveTotal" class="text-xs font-bold text-blue-600 mt-0.5">$0</div>
+                </div>
+            </div>
+
+            <!-- En Proceso -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                <div class="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                    <span>En Fabricación</span>
+                    <span class="p-1.5 bg-amber-50 text-amber-600 rounded-lg"><i data-lucide="loader" class="w-4 h-4"></i></span>
+                </div>
+                <div class="mt-2">
+                    <div id="kpiInProgressCount" class="text-2xl font-extrabold text-slate-900">0</div>
+                    <div class="text-xs text-slate-400 mt-0.5">En taller</div>
+                </div>
+            </div>
+
+            <!-- Listos para entrega -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                <div class="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                    <span>Listos para Entrega</span>
+                    <span class="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg"><i data-lucide="package-check" class="w-4 h-4"></i></span>
+                </div>
+                <div class="mt-2">
+                    <div id="kpiReadyCount" class="text-2xl font-extrabold text-emerald-600">0</div>
+                    <div class="text-xs text-slate-400 mt-0.5">Completados</div>
+                </div>
+            </div>
+
+            <!-- Entregados del Mes -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                <div class="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                    <span>Entregados Mes</span>
+                    <span class="p-1.5 bg-purple-50 text-purple-600 rounded-lg"><i data-lucide="check-check" class="w-4 h-4"></i></span>
+                </div>
+                <div class="mt-2">
+                    <div id="kpiDeliveredCount" class="text-2xl font-extrabold text-slate-900">0</div>
+                    <div id="kpiDeliveredTotal" class="text-xs font-bold text-purple-600 mt-0.5">$0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search, Filter & View Controls -->
+        <div class="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+            <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+                <!-- Search bar -->
+                <div class="relative flex-1">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input id="searchInput" type="text" placeholder="Buscar por cliente, N° pedido, notas o teléfono..." 
+                           class="w-full pl-9 pr-8 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition"
+                           oninput="renderOrders()">
+                    <button onclick="clearSearch()" id="clearSearchBtn" style="display:none;" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+
+                <!-- Status Filter Chips -->
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 text-xs font-semibold">
+                    <button onclick="setStatusFilter('ALL')" id="filterBtn_ALL" class="status-filter-btn px-3 py-1.5 rounded-lg bg-slate-900 text-white transition">
+                        Todos
+                    </button>
+                    <button onclick="setStatusFilter('No iniciada')" id="filterBtn_No_iniciada" class="status-filter-btn px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                        No iniciada
+                    </button>
+                    <button onclick="setStatusFilter('En proceso')" id="filterBtn_En_proceso" class="status-filter-btn px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                        En proceso
+                    </button>
+                    <button onclick="setStatusFilter('Completado')" id="filterBtn_Completado" class="status-filter-btn px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                        Completado
+                    </button>
+                </div>
+
+                <!-- Priority & View Toggle -->
+                <div class="flex items-center gap-2">
+                    <select id="priorityFilter" onchange="renderOrders()" class="text-xs font-semibold px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none">
+                        <option value="ALL">Todas Prioridades</option>
+                        <option value="Rápida">🚨 Rápida</option>
+                        <option value="Normal">🟢 Normal</option>
+                        <option value="Baja">⚪ Baja</option>
+                    </select>
+                    
+                    <!-- Table vs Cards Toggle -->
+                    <div class="bg-slate-100 p-0.5 rounded-lg border border-slate-200 flex">
+                        <button onclick="setViewMode('table')" id="viewModeTableBtn" class="p-1 rounded bg-white text-slate-800 shadow-xs" title="Vista Tabla">
+                            <i data-lucide="table" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="setViewMode('cards')" id="viewModeCardsBtn" class="p-1 rounded text-slate-500 hover:text-slate-800" title="Vista Tarjetas">
+                            <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                        </button>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Section: Active Orders -->
+        <section class="space-y-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                        Pedidos Activos
+                    </h2>
+                    <span id="activeCount" class="text-xs font-bold px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">0</span>
+                </div>
+                <div class="text-sm font-bold text-slate-700">
+                    Subtotal: <span id="activeTotal" class="text-blue-600 font-extrabold">$0</span>
+                </div>
+            </div>
+
+            <!-- Table View Container -->
+            <div id="activeTableView" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <th class="p-2 text-left text-xs">N° Pedido</th>
-                                <th class="p-2 text-left text-xs">Valor</th>
-                                <th class="p-2 text-left text-xs">Prioridad</th>
-                                <th class="p-2 text-left text-xs">Nombre</th>
-                                <th class="p-2 text-left text-xs">Estado</th>
-                                <th class="p-2 text-left text-xs">Fecha Fin.</th>
-                                <th class="p-2 text-left text-xs">Tipo Entrega</th>
-                                <th class="p-2 text-left text-xs">Teléfono</th>
-                                <th class="p-2 text-left text-xs">Lugar</th>
-                                <th class="p-2 text-left text-xs">Notas</th>
-                                <th class="p-2 text-left text-xs">Acciones</th>
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
+                                <th class="py-3 px-3 w-20">N° Pedido</th>
+                                <th class="py-3 px-3 w-28">Cliente</th>
+                                <th class="py-3 px-3 w-24">Valor</th>
+                                <th class="py-3 px-3 w-28">Estado</th>
+                                <th class="py-3 px-3 w-24">Prioridad</th>
+                                <th class="py-3 px-3 w-32">Fecha Entrega</th>
+                                <th class="py-3 px-3 w-28">Tipo Entrega</th>
+                                <th class="py-3 px-3 w-28">Contacto</th>
+                                <th class="py-3 px-3 min-w-[140px]">Notas / Detalle</th>
+                                <th class="py-3 px-3 text-right w-24">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody id="activeOrdersBody"></tbody>
+                        <tbody id="activeOrdersBody" class="divide-y divide-slate-100">
+                            <!-- Populated via JS -->
+                        </tbody>
                     </table>
-                    <div id="noActiveOrders" style="display:none" class="p-8 text-center text-gray-500">
-                        No hay pedidos activos
-                    </div>
+                </div>
+                <!-- Empty State -->
+                <div id="noActiveOrders" style="display:none;" class="py-12 text-center text-slate-400">
+                    <i data-lucide="package-open" class="w-10 h-10 mx-auto text-slate-300 mb-2"></i>
+                    <p class="text-sm font-medium">No hay pedidos activos que coincidan con la búsqueda</p>
+                    <button onclick="openNewOrderModal()" class="mt-3 text-xs font-bold text-brand-600 hover:text-brand-700 inline-flex items-center gap-1">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i> Crear nuevo pedido ahora
+                    </button>
                 </div>
             </div>
 
-            <!-- Delivered Orders -->
-            <div class="bg-white rounded-lg shadow-md">
-                <button onclick="toggleDelivered()" class="w-full p-4 bg-purple-500 text-white rounded-t-lg flex justify-between items-center hover:bg-purple-600">
-                    <div class="flex items-center gap-4">
-                        <h2 class="text-xl font-semibold">Pedidos Entregados (<span id="deliveredCount">0</span>)</h2>
-                        <span class="text-lg font-bold">Total: <span id="deliveredTotal">$0</span></span>
+            <!-- Cards View Container (Alternate) -->
+            <div id="activeCardsView" style="display:none;" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <!-- Cards populated via JS -->
+            </div>
+        </section>
+
+        <!-- Section: Delivered Orders (Accordion) -->
+        <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <button onclick="toggleDelivered()" class="w-full px-4 py-3 bg-slate-50 hover:bg-slate-100/80 transition flex items-center justify-between border-b border-slate-200">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+                    <h2 class="text-sm font-bold text-slate-800">Historial de Pedidos Entregados</h2>
+                    <span id="deliveredCount" class="text-xs font-bold px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">0</span>
+                    <span class="text-xs text-slate-500 font-medium ml-2">Total Entregado: <strong id="deliveredTotal" class="text-purple-600">$0</strong></span>
+                </div>
+                <div class="flex items-center gap-2 text-slate-400">
+                    <span id="deliveredToggleIcon"><i data-lucide="chevron-down" class="w-4 h-4"></i></span>
+                </div>
+            </button>
+
+            <div id="deliveredSection" style="display:none;">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                                <th class="py-2.5 px-3 w-20">N° Pedido</th>
+                                <th class="py-2.5 px-3 w-28">Cliente</th>
+                                <th class="py-2.5 px-3 w-24">Valor</th>
+                                <th class="py-2.5 px-3 w-28">Entregado El</th>
+                                <th class="py-2.5 px-3 w-28">Lugar/Tipo</th>
+                                <th class="py-2.5 px-3 w-28">Teléfono</th>
+                                <th class="py-2.5 px-3 min-w-[140px]">Notas</th>
+                                <th class="py-2.5 px-3 text-right w-24">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="deliveredOrdersBody" class="divide-y divide-slate-100">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="noDeliveredOrders" style="display:none;" class="py-8 text-center text-slate-400 text-xs">
+                    No hay pedidos entregados en este mes.
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal: New / Edit Order -->
+    <div id="orderModal" style="display:none;" class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div class="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="p-1.5 bg-brand-100 text-brand-600 rounded-lg">
+                        <i data-lucide="clipboard-pen" class="w-4 h-4"></i>
                     </div>
-                    <span id="deliveredToggle">▼</span>
+                    <h3 id="modalTitle" class="text-sm font-bold text-slate-900">Nuevo Pedido</h3>
+                </div>
+                <button onclick="closeOrderModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i data-lucide="x" class="w-4 h-4"></i>
                 </button>
-                <div id="deliveredSection" style="display:none">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-gray-100">
-                                <tr>
-                                    <th class="p-2 text-left text-xs">N° Pedido</th>
-                                    <th class="p-2 text-left text-xs">Valor</th>
-                                    <th class="p-2 text-left text-xs">Prioridad</th>
-                                    <th class="p-2 text-left text-xs">Nombre</th>
-                                    <th class="p-2 text-left text-xs">Estado</th>
-                                    <th class="p-2 text-left text-xs">Fecha Fin.</th>
-                                    <th class="p-2 text-left text-xs">Tipo Entrega</th>
-                                    <th class="p-2 text-left text-xs">Teléfono</th>
-                                    <th class="p-2 text-left text-xs">Lugar</th>
-                                    <th class="p-2 text-left text-xs">Notas</th>
-                                    <th class="p-2 text-left text-xs">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="deliveredOrdersBody"></tbody>
-                        </table>
-                        <div id="noDeliveredOrders" style="display:none" class="p-8 text-center text-gray-500">
-                            No hay pedidos entregados
-                        </div>
-                    </div>
-                </div>
             </div>
 
-            <!-- Footer -->
-            <div class="mt-4 text-right">
-                <span class="text-xs text-gray-500">v22</span>
-            </div>
+            <form id="orderForm" onsubmit="handleOrderFormSubmit(event)" class="p-5 space-y-4 text-xs font-semibold">
+                <input type="hidden" id="formOrderId">
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-600 mb-1">N° Pedido</label>
+                        <input id="formNumero" type="text" placeholder="Ej: 1045" required
+                               class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-slate-600 mb-1">Valor ($CLP)</label>
+                        <input id="formValor" type="text" placeholder="$15.000"
+                               class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-600 mb-1">Nombre Cliente</label>
+                        <input id="formNombre" type="text" placeholder="Nombre completo" required
+                               class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-slate-600 mb-1">Teléfono / WhatsApp</label>
+                        <input id="formTelefono" type="tel" placeholder="+56912345678"
+                               class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-slate-600 mb-1">Prioridad</label>
+                        <select id="formPrioridad" class="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            <option value="Normal">🟢 Normal</option>
+                            <option value="Rápida">🚨 Rápida</option>
+                            <option value="Baja">⚪ Baja</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-600 mb-1">Estado</label>
+                        <select id="formEstado" class="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            <option value="No iniciada">No iniciada</option>
+                            <option value="En proceso">En proceso</option>
+                            <option value="Completado">Completado</option>
+                            <option value="Entregado">Entregado</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-600 mb-1">Tipo Entrega</label>
+                        <select id="formTipoEntrega" class="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            <option value="La Cisterna">La Cisterna</option>
+                            <option value="Puente Alto">Puente Alto</option>
+                            <option value="Envío">Envío Starken/Chilexpress</option>
+                            <option value="Retiro Taller">Retiro Taller</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-600 mb-1">Fecha Entrega / Plazo</label>
+                        <input id="formFechaFinalizacion" type="date"
+                               class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-slate-600 mb-1">Lugar de Retiro / Despacho</label>
+                        <input id="formLugar" type="text" placeholder="Ej: Metro Lo Ovalle / Domicilio"
+                               class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-slate-600 mb-1">Notas y Especificaciones del Pedido</label>
+                    <textarea id="formNotas" rows="2" placeholder="Detalles del diseño, medidas, color, observaciones..."
+                              class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                    <button type="button" onclick="closeOrderModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg shadow-sm transition active:scale-95">
+                        Guardar Pedido
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-400">
+        <div class="max-w-7xl mx-auto px-4 flex items-center justify-between">
+            <span>Sistema de Pedidos Gcrea &bull; Versión 2.0 (Modernizada)</span>
+            <span class="flex items-center gap-1 text-slate-500 font-medium">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-500"></i> Almacenamiento seguro local + Google Sheets
+            </span>
+        </div>
+    </footer>
+
+    <!-- App JavaScript Logic -->
     <script>
         // State
         let activeOrders = [];
         let deliveredOrders = [];
         let sheetUrl = '';
         let currentMonth = '';
+        let currentStatusFilter = 'ALL';
+        let viewMode = 'table'; // 'table' or 'cards'
 
-        // Initialize
+        // Initialization
         function init() {
             currentMonth = getCurrentMonthName();
-            document.getElementById('currentMonth').textContent = currentMonth;
-            
-            // Load config
+            const badge = document.getElementById('monthBadge');
+            if (badge) badge.textContent = currentMonth.replace('_', ' ');
+
+            // Load saved Google Sheet URL
             const savedUrl = localStorage.getItem('googleSheetUrl');
             if (savedUrl) {
                 sheetUrl = savedUrl;
                 document.getElementById('sheetUrlInput').value = savedUrl;
             }
-            
-            // Load orders
+
+            // Load view mode preference
+            const savedView = localStorage.getItem('pedidos_view_mode');
+            if (savedView) viewMode = savedView;
+            applyViewModeUI();
+
+            // Load orders from LocalStorage
             const savedActive = localStorage.getItem(`activeOrders_${currentMonth}`);
             const savedDelivered = localStorage.getItem(`deliveredOrders_${currentMonth}`);
-            
-            if (savedActive) activeOrders = JSON.parse(savedActive);
-            if (savedDelivered) deliveredOrders = JSON.parse(savedDelivered);
-            
+
+            if (savedActive) {
+                try { activeOrders = JSON.parse(savedActive); } catch(e) { activeOrders = []; }
+            }
+            if (savedDelivered) {
+                try { deliveredOrders = JSON.parse(savedDelivered); } catch(e) { deliveredOrders = []; }
+            }
+
             renderOrders();
+            lucide.createIcons();
         }
 
         function getCurrentMonthName() {
@@ -187,44 +521,404 @@
             localStorage.setItem(`deliveredOrders_${currentMonth}`, JSON.stringify(deliveredOrders));
         }
 
-        function addOrder() {
-            const newOrder = {
-                id: Date.now() + Math.random(),
-                numero: '',
-                valor: '',
-                prioridad: 'Normal',
-                nombre: '',
-                estado: 'No iniciada',
-                fechaFinalizacion: '',
-                tipoEntrega: 'La Cisterna',
-                telefono: '',
-                lugar: '',
-                notas: ''
-            };
-            activeOrders.unshift(newOrder);
-            saveToLocalStorage();
-            renderOrders();
+        // Helpers & Formatting
+        function formatCurrency(val) {
+            const num = parseFloat(String(val).replace(/[^0-9.-]/g, '') || 0);
+            return new Intl.NumberFormat('es-CL', {
+                style: 'currency',
+                currency: 'CLP',
+                minimumFractionDigits: 0
+            }).format(num);
         }
 
-        function updateOrder(id, field, value, isDelivered) {
-            const orders = isDelivered ? deliveredOrders : activeOrders;
-            const order = orders.find(o => o.id === id);
-            if (order) {
-                order[field] = value;
-                saveToLocalStorage();
-                updateTotals();
+        function calculateTotal(orders) {
+            return orders.reduce((sum, order) => {
+                const val = parseFloat(String(order.valor || '').replace(/[^0-9.-]/g, '') || 0);
+                return sum + val;
+            }, 0);
+        }
+
+        function getPriorityBadge(priority) {
+            switch(priority) {
+                case 'Rápida':
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700 border border-rose-200"><span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>Rápida</span>`;
+                case 'Baja':
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">Baja</span>`;
+                default:
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">Normal</span>`;
             }
         }
 
-        function deleteOrder(id, isDelivered) {
-            if (confirm('¿Eliminar este pedido?')) {
-                if (isDelivered) {
-                    deliveredOrders = deliveredOrders.filter(o => o.id !== id);
-                } else {
-                    activeOrders = activeOrders.filter(o => o.id !== id);
-                }
+        function getStatusBadge(status) {
+            switch(status) {
+                case 'En proceso':
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>En proceso</span>`;
+                case 'Completado':
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Listo</span>`;
+                case 'Entregado':
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">Entregado</span>`;
+                default:
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-800 border border-blue-200">No iniciada</span>`;
+            }
+        }
+
+        function getDateDueBadge(dateStr) {
+            if (!dateStr) return `<span class="text-slate-400 italic text-[11px]">Sin fecha</span>`;
+            
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const target = new Date(dateStr + 'T00:00:00');
+            const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
+
+            if (diffDays < 0) {
+                return `<div class="flex items-center gap-1 text-rose-600 font-bold text-[11px]" title="${dateStr}">
+                    <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> Vencido (${dateStr})
+                </div>`;
+            } else if (diffDays === 0) {
+                return `<div class="flex items-center gap-1 text-amber-600 font-bold text-[11px]" title="${dateStr}">
+                    <i data-lucide="clock" class="w-3.5 h-3.5"></i> ¡Entrega Hoy!
+                </div>`;
+            } else if (diffDays === 1) {
+                return `<div class="flex items-center gap-1 text-blue-600 font-semibold text-[11px]" title="${dateStr}">
+                    Mañana (${dateStr})
+                </div>`;
+            } else {
+                return `<div class="text-slate-600 font-medium text-[11px]">${dateStr}</div>`;
+            }
+        }
+
+        function formatWhatsAppLink(phone, order) {
+            if (!phone) return null;
+            let clean = phone.replace(/[^0-9]/g, '');
+            if (clean.length === 8) clean = '569' + clean;
+            else if (clean.length === 9 && clean.startsWith('9')) clean = '56' + clean;
+            else if (clean.length === 11 && clean.startsWith('56')) clean = clean;
+            
+            const message = encodeURIComponent(`Hola ${order.nombre || ''}, te escribimos de Gcrea respecto a tu pedido #${order.numero || ''}.`);
+            return `https://wa.me/${clean}?text=${message}`;
+        }
+
+        // Toast alert replacement
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const isSuccess = type === 'success';
+            const isError = type === 'error';
+
+            toast.className = `toast px-4 py-3 rounded-xl shadow-lg border text-xs font-semibold flex items-center gap-2 text-white ${
+                isSuccess ? 'bg-slate-900 border-slate-800' : isError ? 'bg-rose-600 border-rose-700' : 'bg-blue-600 border-blue-700'
+            }`;
+
+            toast.innerHTML = `
+                <i data-lucide="${isSuccess ? 'check-circle' : isError ? 'alert-circle' : 'info'}" class="w-4 h-4"></i>
+                <span>${message}</span>
+            `;
+
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px)';
+                toast.style.transition = 'all 0.2s ease-in';
+                setTimeout(() => toast.remove(), 200);
+            }, 3000);
+        }
+
+        // Render functions
+        function renderOrders() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+            const priorityVal = document.getElementById('priorityFilter').value;
+
+            // Filter active orders
+            const filteredActive = activeOrders.filter(o => {
+                const matchSearch = !searchTerm || 
+                    (o.numero && o.numero.toString().toLowerCase().includes(searchTerm)) ||
+                    (o.nombre && o.nombre.toLowerCase().includes(searchTerm)) ||
+                    (o.telefono && o.telefono.includes(searchTerm)) ||
+                    (o.notas && o.notas.toLowerCase().includes(searchTerm)) ||
+                    (o.lugar && o.lugar.toLowerCase().includes(searchTerm));
+
+                const matchStatus = currentStatusFilter === 'ALL' || o.estado === currentStatusFilter;
+                const matchPriority = priorityVal === 'ALL' || o.prioridad === priorityVal;
+
+                return matchSearch && matchStatus && matchPriority;
+            });
+
+            // Filter delivered orders
+            const filteredDelivered = deliveredOrders.filter(o => {
+                return !searchTerm ||
+                    (o.numero && o.numero.toString().toLowerCase().includes(searchTerm)) ||
+                    (o.nombre && o.nombre.toLowerCase().includes(searchTerm)) ||
+                    (o.notas && o.notas.toLowerCase().includes(searchTerm));
+            });
+
+            // Render Active Table Rows
+            const activeBody = document.getElementById('activeOrdersBody');
+            const noActive = document.getElementById('noActiveOrders');
+
+            if (filteredActive.length === 0) {
+                activeBody.innerHTML = '';
+                noActive.style.display = 'block';
+            } else {
+                noActive.style.display = 'none';
+                activeBody.innerHTML = filteredActive.map(o => createTableRow(o, false)).join('');
+            }
+
+            // Render Active Cards View
+            const cardsContainer = document.getElementById('activeCardsView');
+            if (cardsContainer) {
+                cardsContainer.innerHTML = filteredActive.map(o => createCardView(o)).join('');
+            }
+
+            // Render Delivered Table Rows
+            const deliveredBody = document.getElementById('deliveredOrdersBody');
+            const noDelivered = document.getElementById('noDeliveredOrders');
+
+            if (filteredDelivered.length === 0) {
+                deliveredBody.innerHTML = '';
+                noDelivered.style.display = 'block';
+            } else {
+                noDelivered.style.display = 'none';
+                deliveredBody.innerHTML = filteredDelivered.map(o => createTableRow(o, true)).join('');
+            }
+
+            // Update Counts and KPI summary
+            updateSummaryMetrics();
+            lucide.createIcons();
+
+            // Clear search button visibility
+            const clearBtn = document.getElementById('clearSearchBtn');
+            if (clearBtn) clearBtn.style.display = searchTerm ? 'block' : 'none';
+        }
+
+        function createTableRow(o, isDelivered) {
+            const waLink = formatWhatsAppLink(o.telefono, o);
+
+            if (isDelivered) {
+                return `
+                <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                    <td class="py-2.5 px-3 font-bold text-slate-800">#${o.numero || '-'}</td>
+                    <td class="py-2.5 px-3 font-semibold text-slate-900">${o.nombre || '-'}</td>
+                    <td class="py-2.5 px-3 font-bold text-slate-700">${formatCurrency(o.valor)}</td>
+                    <td class="py-2.5 px-3 text-slate-500 font-medium">${o.fechaEntrega || '-'}</td>
+                    <td class="py-2.5 px-3 text-slate-600">${o.tipoEntrega || o.lugar || '-'}</td>
+                    <td class="py-2.5 px-3">
+                        ${waLink ? `
+                            <a href="${waLink}" target="_blank" class="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-bold" title="Contactar por WhatsApp">
+                                <i data-lucide="message-circle" class="w-3.5 h-3.5"></i> ${o.telefono}
+                            </a>
+                        ` : `<span class="text-slate-400">${o.telefono || '-'}</span>`}
+                    </td>
+                    <td class="py-2.5 px-3 text-slate-500 truncate max-w-[200px]" title="${o.notas || ''}">${o.notas || '-'}</td>
+                    <td class="py-2.5 px-3 text-right">
+                        <div class="flex items-center justify-end gap-1">
+                            <button onclick="moveToActive(${o.id})" class="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition" title="Reactivar pedido">
+                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <button onclick="deleteOrder(${o.id}, true)" class="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition" title="Eliminar">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>`;
+            }
+
+            return `
+            <tr class="hover:bg-slate-50/80 transition border-b border-slate-100 group">
+                <!-- N° Pedido -->
+                <td class="py-2.5 px-3">
+                    <span class="font-extrabold text-slate-900 text-xs px-2 py-1 bg-slate-100 rounded-md">#${o.numero || '-'}</span>
+                </td>
+                <!-- Cliente -->
+                <td class="py-2.5 px-3">
+                    <div class="font-bold text-slate-900 text-xs">${o.nombre || 'Sin nombre'}</div>
+                    ${o.lugar ? `<div class="text-[10px] text-slate-400 flex items-center gap-0.5 mt-0.5"><i data-lucide="map-pin" class="w-3 h-3"></i> ${o.lugar}</div>` : ''}
+                </td>
+                <!-- Valor -->
+                <td class="py-2.5 px-3 font-extrabold text-slate-800 text-xs">
+                    ${formatCurrency(o.valor)}
+                </td>
+                <!-- Estado Selector -->
+                <td class="py-2.5 px-3">
+                    <select onchange="updateOrderStatus(${o.id}, this.value)" 
+                            class="text-xs font-semibold px-2 py-1 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer">
+                        <option value="No iniciada" ${o.estado === 'No iniciada' ? 'selected' : ''}>🔵 No iniciada</option>
+                        <option value="En proceso" ${o.estado === 'En proceso' ? 'selected' : ''}>🟡 En proceso</option>
+                        <option value="Completado" ${o.estado === 'Completado' ? 'selected' : ''}>🟢 Completado</option>
+                    </select>
+                </td>
+                <!-- Prioridad -->
+                <td class="py-2.5 px-3">
+                    ${getPriorityBadge(o.prioridad)}
+                </td>
+                <!-- Fecha Entrega -->
+                <td class="py-2.5 px-3">
+                    ${getDateDueBadge(o.fechaFinalizacion)}
+                </td>
+                <!-- Tipo Entrega -->
+                <td class="py-2.5 px-3 text-slate-600 font-medium text-xs">
+                    ${o.tipoEntrega || 'La Cisterna'}
+                </td>
+                <!-- Contacto WhatsApp -->
+                <td class="py-2.5 px-3">
+                    ${waLink ? `
+                        <a href="${waLink}" target="_blank" class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold transition" title="Abrir WhatsApp">
+                            <i data-lucide="message-circle" class="w-3.5 h-3.5"></i> ${o.telefono}
+                        </a>
+                    ` : `<span class="text-slate-400 text-xs">${o.telefono || '-'}</span>`}
+                </td>
+                <!-- Notas -->
+                <td class="py-2.5 px-3 text-slate-500 truncate max-w-[200px]" title="${o.notas || ''}">
+                    ${o.notas || '-'}
+                </td>
+                <!-- Acciones -->
+                <td class="py-2.5 px-3 text-right">
+                    <div class="flex items-center justify-end gap-1">
+                        <button onclick="markAsDelivered(${o.id})" class="p-1.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 transition" title="Marcar como Entregado">
+                            <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button onclick="openEditOrderModal(${o.id})" class="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition" title="Editar">
+                            <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button onclick="deleteOrder(${o.id}, false)" class="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition" title="Eliminar">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>`;
+        }
+
+        function createCardView(o) {
+            const waLink = formatWhatsAppLink(o.telefono, o);
+            return `
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-3 hover:border-slate-300 transition">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-extrabold text-sm text-slate-900 bg-slate-100 px-2 py-0.5 rounded">#${o.numero || '-'}</span>
+                            ${getPriorityBadge(o.prioridad)}
+                        </div>
+                        <h4 class="font-bold text-slate-900 text-sm mt-1">${o.nombre || 'Sin nombre'}</h4>
+                    </div>
+                    <span class="font-extrabold text-sm text-brand-600">${formatCurrency(o.valor)}</span>
+                </div>
+
+                <div class="space-y-1.5 text-xs text-slate-600">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-400">Estado:</span>
+                        ${getStatusBadge(o.estado)}
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-400">Plazo:</span>
+                        ${getDateDueBadge(o.fechaFinalizacion)}
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-400">Entrega:</span>
+                        <span class="font-medium text-slate-700">${o.tipoEntrega || 'La Cisterna'}</span>
+                    </div>
+                    ${o.notas ? `
+                        <div class="pt-2 border-t border-slate-100 text-[11px] text-slate-500 italic">
+                            "${o.notas}"
+                        </div>
+                    ` : ''}
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <div>
+                        ${waLink ? `
+                            <a href="${waLink}" target="_blank" class="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-bold text-xs">
+                                <i data-lucide="message-circle" class="w-3.5 h-3.5"></i> WhatsApp
+                            </a>
+                        ` : '<span class="text-slate-400 text-xs">Sin tel</span>'}
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button onclick="markAsDelivered(${o.id})" class="px-2.5 py-1 bg-purple-50 text-purple-700 hover:bg-purple-100 font-bold rounded-lg text-xs flex items-center gap-1">
+                            <i data-lucide="check" class="w-3 h-3"></i> Entregar
+                        </button>
+                        <button onclick="openEditOrderModal(${o.id})" class="p-1 rounded-lg text-slate-400 hover:text-slate-700">
+                            <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button onclick="deleteOrder(${o.id}, false)" class="p-1 rounded-lg text-rose-400 hover:text-rose-600">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function updateSummaryMetrics() {
+            const activeTotal = calculateTotal(activeOrders);
+            const deliveredTotal = calculateTotal(deliveredOrders);
+            const inProgressCount = activeOrders.filter(o => o.estado === 'En proceso').length;
+            const readyCount = activeOrders.filter(o => o.estado === 'Completado').length;
+
+            document.getElementById('activeCount').textContent = activeOrders.length;
+            document.getElementById('activeTotal').textContent = formatCurrency(activeTotal);
+            document.getElementById('deliveredCount').textContent = deliveredOrders.length;
+            document.getElementById('deliveredTotal').textContent = formatCurrency(deliveredTotal);
+
+            document.getElementById('kpiActiveCount').textContent = activeOrders.length;
+            document.getElementById('kpiActiveTotal').textContent = formatCurrency(activeTotal);
+            document.getElementById('kpiInProgressCount').textContent = inProgressCount;
+            document.getElementById('kpiReadyCount').textContent = readyCount;
+            document.getElementById('kpiDeliveredCount').textContent = deliveredOrders.length;
+            document.getElementById('kpiDeliveredTotal').textContent = formatCurrency(deliveredTotal);
+        }
+
+        // View Mode Handling
+        function setViewMode(mode) {
+            viewMode = mode;
+            localStorage.setItem('pedidos_view_mode', mode);
+            applyViewModeUI();
+        }
+
+        function applyViewModeUI() {
+            const tableView = document.getElementById('activeTableView');
+            const cardsView = document.getElementById('activeCardsView');
+            const tableBtn = document.getElementById('viewModeTableBtn');
+            const cardsBtn = document.getElementById('viewModeCardsBtn');
+
+            if (viewMode === 'cards') {
+                tableView.style.display = 'none';
+                cardsView.style.display = 'grid';
+                cardsBtn.className = 'p-1 rounded bg-white text-slate-800 shadow-xs';
+                tableBtn.className = 'p-1 rounded text-slate-500 hover:text-slate-800';
+            } else {
+                tableView.style.display = 'block';
+                cardsView.style.display = 'none';
+                tableBtn.className = 'p-1 rounded bg-white text-slate-800 shadow-xs';
+                cardsBtn.className = 'p-1 rounded text-slate-500 hover:text-slate-800';
+            }
+            lucide.createIcons();
+        }
+
+        // Filter Handling
+        function setStatusFilter(status) {
+            currentStatusFilter = status;
+            document.querySelectorAll('.status-filter-btn').forEach(btn => {
+                btn.className = 'status-filter-btn px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition';
+            });
+            const safeId = 'filterBtn_' + status.replace(/ /g, '_');
+            const activeBtn = document.getElementById(safeId);
+            if (activeBtn) activeBtn.className = 'status-filter-btn px-3 py-1.5 rounded-lg bg-slate-900 text-white transition';
+
+            renderOrders();
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            renderOrders();
+        }
+
+        // Order Actions
+        function updateOrderStatus(id, newStatus) {
+            const order = activeOrders.find(o => o.id === id);
+            if (order) {
+                order.estado = newStatus;
                 saveToLocalStorage();
                 renderOrders();
+                showToast(`Pedido #${order.numero} cambiado a "${newStatus}"`);
             }
         }
 
@@ -237,6 +931,7 @@
                 activeOrders = activeOrders.filter(o => o.id !== id);
                 saveToLocalStorage();
                 renderOrders();
+                showToast(`Pedido #${order.numero} marcado como entregado`, 'success');
             }
         }
 
@@ -244,211 +939,139 @@
             const order = deliveredOrders.find(o => o.id === id);
             if (order) {
                 delete order.fechaEntrega;
+                order.estado = 'En proceso';
                 activeOrders.unshift(order);
                 deliveredOrders = deliveredOrders.filter(o => o.id !== id);
                 saveToLocalStorage();
                 renderOrders();
+                showToast(`Pedido #${order.numero} reactivado a Activos`);
             }
         }
 
-        function getPriorityColor(prioridad) {
-            const colors = {
-                'Rápida': 'bg-red-100 text-red-800',
-                'Normal': 'bg-green-100 text-green-800',
-                'Baja': 'bg-gray-100 text-gray-800'
+        function deleteOrder(id, isDelivered) {
+            if (confirm('¿Estás seguro de que deseas eliminar este pedido?')) {
+                if (isDelivered) {
+                    deliveredOrders = deliveredOrders.filter(o => o.id !== id);
+                } else {
+                    activeOrders = activeOrders.filter(o => o.id !== id);
+                }
+                saveToLocalStorage();
+                renderOrders();
+                showToast('Pedido eliminado correctamente', 'info');
+            }
+        }
+
+        // Modal Handling
+        function openNewOrderModal() {
+            document.getElementById('modalTitle').textContent = 'Nuevo Pedido';
+            document.getElementById('orderForm').reset();
+            document.getElementById('formOrderId').value = '';
+            document.getElementById('formPrioridad').value = 'Normal';
+            document.getElementById('formEstado').value = 'No iniciada';
+            document.getElementById('formTipoEntrega').value = 'La Cisterna';
+            document.getElementById('orderModal').style.display = 'flex';
+            lucide.createIcons();
+            document.getElementById('formNumero').focus();
+        }
+
+        function openEditOrderModal(id) {
+            const order = activeOrders.find(o => o.id === id) || deliveredOrders.find(o => o.id === id);
+            if (!order) return;
+
+            document.getElementById('modalTitle').textContent = `Editar Pedido #${order.numero || ''}`;
+            document.getElementById('formOrderId').value = order.id;
+            document.getElementById('formNumero').value = order.numero || '';
+            document.getElementById('formValor').value = order.valor || '';
+            document.getElementById('formNombre').value = order.nombre || '';
+            document.getElementById('formTelefono').value = order.telefono || '';
+            document.getElementById('formPrioridad').value = order.prioridad || 'Normal';
+            document.getElementById('formEstado').value = order.estado || 'No iniciada';
+            document.getElementById('formTipoEntrega').value = order.tipoEntrega || 'La Cisterna';
+            document.getElementById('formFechaFinalizacion').value = order.fechaFinalizacion || '';
+            document.getElementById('formLugar').value = order.lugar || '';
+            document.getElementById('formNotas').value = order.notas || '';
+
+            document.getElementById('orderModal').style.display = 'flex';
+            lucide.createIcons();
+        }
+
+        function closeOrderModal() {
+            document.getElementById('orderModal').style.display = 'none';
+        }
+
+        function handleOrderFormSubmit(e) {
+            e.preventDefault();
+            const orderId = document.getElementById('formOrderId').value;
+
+            const orderData = {
+                numero: document.getElementById('formNumero').value.trim(),
+                valor: document.getElementById('formValor').value.trim(),
+                nombre: document.getElementById('formNombre').value.trim(),
+                telefono: document.getElementById('formTelefono').value.trim(),
+                prioridad: document.getElementById('formPrioridad').value,
+                estado: document.getElementById('formEstado').value,
+                tipoEntrega: document.getElementById('formTipoEntrega').value,
+                fechaFinalizacion: document.getElementById('formFechaFinalizacion').value,
+                lugar: document.getElementById('formLugar').value.trim(),
+                notas: document.getElementById('formNotas').value.trim(),
             };
-            return colors[prioridad] || colors['Normal'];
-        }
 
-        function getStatusColor(estado) {
-            const colors = {
-                'No iniciada': 'bg-blue-100 text-blue-800',
-                'En proceso': 'bg-yellow-100 text-yellow-800',
-                'Completado': 'bg-green-100 text-green-800',
-                'Entregado': 'bg-purple-100 text-purple-800'
-            };
-            return colors[estado] || colors['No iniciada'];
-        }
-
-        function calculateTotal(orders) {
-            return orders.reduce((sum, order) => {
-                const value = parseFloat(order.valor.replace(/[^0-9.-]/g, '') || 0);
-                return sum + value;
-            }, 0);
-        }
-
-        function formatCurrency(value) {
-            return new Intl.NumberFormat('es-CL', {
-                style: 'currency',
-                currency: 'CLP',
-                minimumFractionDigits: 0
-            }).format(value);
-        }
-
-        function updateTotals() {
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            
-            const filteredActive = activeOrders.filter(o => 
-                o.numero?.toString().includes(searchTerm) ||
-                o.nombre?.toLowerCase().includes(searchTerm) ||
-                o.telefono?.includes(searchTerm)
-            );
-            
-            const filteredDelivered = deliveredOrders.filter(o => 
-                o.numero?.toString().includes(searchTerm) ||
-                o.nombre?.toLowerCase().includes(searchTerm)
-            );
-            
-            document.getElementById('activeCount').textContent = filteredActive.length;
-            document.getElementById('activeTotal').textContent = formatCurrency(calculateTotal(filteredActive));
-            document.getElementById('deliveredCount').textContent = filteredDelivered.length;
-            document.getElementById('deliveredTotal').textContent = formatCurrency(calculateTotal(filteredDelivered));
-        }
-
-        function createOrderRow(order, isDelivered) {
-            return `
-                <tr class="border-b hover:bg-gray-50">
-                    <td class="p-2">
-                        <input class="w-20 p-2 border rounded text-sm text-center" 
-                               value="${order.numero || ''}" 
-                               onchange="updateOrder(${order.id}, 'numero', this.value, ${isDelivered})"
-                               placeholder="####">
-                    </td>
-                    <td class="p-2">
-                        <input class="w-20 p-1 border rounded text-sm" 
-                               value="${order.valor || ''}" 
-                               onchange="updateOrder(${order.id}, 'valor', this.value, ${isDelivered})"
-                               placeholder="$0">
-                    </td>
-                    <td class="p-2">
-                        <select class="w-20 p-1 rounded text-xs font-medium ${getPriorityColor(order.prioridad)}" 
-                                onchange="updateOrder(${order.id}, 'prioridad', this.value, ${isDelivered}); renderOrders()">
-                            <option ${order.prioridad === 'Rápida' ? 'selected' : ''}>Rápida</option>
-                            <option ${order.prioridad === 'Normal' ? 'selected' : ''}>Normal</option>
-                            <option ${order.prioridad === 'Baja' ? 'selected' : ''}>Baja</option>
-                        </select>
-                    </td>
-                    <td class="p-2">
-                        <input class="w-24 p-1 border rounded text-sm" 
-                               value="${order.nombre || ''}" 
-                               onchange="updateOrder(${order.id}, 'nombre', this.value, ${isDelivered})"
-                               placeholder="Nombre">
-                    </td>
-                    <td class="p-2">
-                        <select class="w-24 p-1 rounded text-xs font-medium ${getStatusColor(order.estado)}" 
-                                onchange="updateOrder(${order.id}, 'estado', this.value, ${isDelivered}); renderOrders()">
-                            <option ${order.estado === 'No iniciada' ? 'selected' : ''}>No iniciada</option>
-                            <option ${order.estado === 'En proceso' ? 'selected' : ''}>En proceso</option>
-                            <option ${order.estado === 'Completado' ? 'selected' : ''}>Completado</option>
-                        </select>
-                    </td>
-                    <td class="p-2">
-                        <input type="date" class="w-28 p-1 border rounded text-xs" 
-                               value="${order.fechaFinalizacion || ''}" 
-                               onchange="updateOrder(${order.id}, 'fechaFinalizacion', this.value, ${isDelivered})">
-                    </td>
-                    <td class="p-2">
-                        <select class="w-28 p-1 border rounded text-xs" 
-                                onchange="updateOrder(${order.id}, 'tipoEntrega', this.value, ${isDelivered})">
-                            <option ${order.tipoEntrega === 'La Cisterna' ? 'selected' : ''}>La Cisterna</option>
-                            <option ${order.tipoEntrega === 'Puente Alto' ? 'selected' : ''}>Puente Alto</option>
-                            <option ${order.tipoEntrega === 'Envío' ? 'selected' : ''}>Envío</option>
-                        </select>
-                    </td>
-                    <td class="p-2">
-                        <input class="w-20 p-1 border rounded text-sm" 
-                               value="${order.telefono || ''}" 
-                               onchange="updateOrder(${order.id}, 'telefono', this.value, ${isDelivered})"
-                               placeholder="##">
-                    </td>
-                    <td class="p-2">
-                        <input class="w-20 p-1 border rounded text-sm" 
-                               value="${order.lugar || ''}" 
-                               onchange="updateOrder(${order.id}, 'lugar', this.value, ${isDelivered})"
-                               placeholder="Lugar">
-                    </td>
-                    <td class="p-2">
-                        <input class="w-24 p-1 border rounded text-sm" 
-                               value="${order.notas || ''}" 
-                               onchange="updateOrder(${order.id}, 'notas', this.value, ${isDelivered})"
-                               placeholder="Notas">
-                    </td>
-                    <td class="p-2">
-                        <div class="flex gap-1">
-                            ${!isDelivered ? `
-                                <button onclick="markAsDelivered(${order.id})" 
-                                        class="p-1 bg-green-500 text-white rounded hover:bg-green-600" 
-                                        title="Marcar como entregado">✓</button>
-                            ` : `
-                                <button onclick="moveToActive(${order.id})" 
-                                        class="p-1 bg-blue-500 text-white rounded hover:bg-blue-600" 
-                                        title="Volver a activos">↑</button>
-                            `}
-                            <button onclick="deleteOrder(${order.id}, ${isDelivered})" 
-                                    class="p-1 bg-red-500 text-white rounded hover:bg-red-600" 
-                                    title="Eliminar">✕</button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }
-
-        function renderOrders() {
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            
-            const filteredActive = activeOrders.filter(o => 
-                o.numero?.toString().includes(searchTerm) ||
-                o.nombre?.toLowerCase().includes(searchTerm) ||
-                o.telefono?.includes(searchTerm)
-            );
-            
-            const filteredDelivered = deliveredOrders.filter(o => 
-                o.numero?.toString().includes(searchTerm) ||
-                o.nombre?.toLowerCase().includes(searchTerm)
-            );
-            
-            // Render active
-            const activeBody = document.getElementById('activeOrdersBody');
-            if (filteredActive.length === 0) {
-                activeBody.innerHTML = '';
-                document.getElementById('noActiveOrders').style.display = 'block';
+            if (orderId) {
+                // Editing existing order
+                const activeIndex = activeOrders.findIndex(o => o.id == orderId);
+                if (activeIndex !== -1) {
+                    activeOrders[activeIndex] = { ...activeOrders[activeIndex], ...orderData };
+                    if (orderData.estado === 'Entregado') {
+                        const moved = activeOrders.splice(activeIndex, 1)[0];
+                        moved.fechaEntrega = new Date().toLocaleDateString('es-CL');
+                        deliveredOrders.unshift(moved);
+                    }
+                } else {
+                    const deliveredIndex = deliveredOrders.findIndex(o => o.id == orderId);
+                    if (deliveredIndex !== -1) {
+                        deliveredOrders[deliveredIndex] = { ...deliveredOrders[deliveredIndex], ...orderData };
+                        if (orderData.estado !== 'Entregado') {
+                            const moved = deliveredOrders.splice(deliveredIndex, 1)[0];
+                            delete moved.fechaEntrega;
+                            activeOrders.unshift(moved);
+                        }
+                    }
+                }
+                showToast(`Pedido #${orderData.numero} actualizado`);
             } else {
-                activeBody.innerHTML = filteredActive.map(o => createOrderRow(o, false)).join('');
-                document.getElementById('noActiveOrders').style.display = 'none';
+                // New order
+                const newOrder = {
+                    id: Date.now() + Math.random(),
+                    ...orderData
+                };
+                if (newOrder.estado === 'Entregado') {
+                    newOrder.fechaEntrega = new Date().toLocaleDateString('es-CL');
+                    deliveredOrders.unshift(newOrder);
+                } else {
+                    activeOrders.unshift(newOrder);
+                }
+                showToast(`Pedido #${orderData.numero} agregado exitosamente`);
             }
-            
-            // Render delivered
-            const deliveredBody = document.getElementById('deliveredOrdersBody');
-            if (filteredDelivered.length === 0) {
-                deliveredBody.innerHTML = '';
-                document.getElementById('noDeliveredOrders').style.display = 'block';
-            } else {
-                deliveredBody.innerHTML = filteredDelivered.map(o => createOrderRow(o, true)).join('');
-                document.getElementById('noDeliveredOrders').style.display = 'none';
-            }
-            
-            updateTotals();
-        }
 
-        function filterOrders() {
+            saveToLocalStorage();
+            closeOrderModal();
             renderOrders();
         }
 
+        // Section Toggles
         function toggleDelivered() {
-            const section = document.getElementById('deliveredSection');
-            const toggle = document.getElementById('deliveredToggle');
-            if (section.style.display === 'none') {
-                section.style.display = 'block';
-                toggle.textContent = '▲';
-            } else {
-                section.style.display = 'none';
-                toggle.textContent = '▼';
-            }
+            const sec = document.getElementById('deliveredSection');
+            const icon = document.getElementById('deliveredToggleIcon');
+            const isHidden = sec.style.display === 'none';
+            sec.style.display = isHidden ? 'block' : 'none';
+            icon.innerHTML = `<i data-lucide="${isHidden ? 'chevron-up' : 'chevron-down'}" class="w-4 h-4"></i>`;
+            lucide.createIcons();
         }
 
         function toggleConfig() {
             const panel = document.getElementById('configPanel');
             panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            lucide.createIcons();
         }
 
         function saveSheetUrl() {
@@ -457,48 +1080,51 @@
                 localStorage.setItem('googleSheetUrl', url);
                 sheetUrl = url;
                 document.getElementById('configPanel').style.display = 'none';
-                alert('URL de Google Sheets configurada correctamente');
+                showToast('URL de Google Sheets guardada correctamente');
             }
         }
 
+        // Google Sheets Integration (Exact same API contract)
         async function loadFromSheets() {
             if (!sheetUrl) {
-                alert('Por favor configura la URL de Google Sheets primero');
+                showToast('Configura primero la URL de Google Apps Script', 'error');
                 toggleConfig();
                 return;
             }
-            
+
             try {
+                showToast('Conectando con Google Sheets...', 'info');
                 const response = await fetch(`${sheetUrl}?action=getAll&month=${currentMonth}`);
                 const data = await response.json();
-                
+
                 if (data.success) {
                     activeOrders = data.activeOrders || [];
                     deliveredOrders = data.deliveredOrders || [];
                     saveToLocalStorage();
                     renderOrders();
-                    
+
                     const status = document.getElementById('syncStatus');
-                    status.textContent = `✅ Datos cargados desde Google Sheets (${currentMonth}) - ${new Date().toLocaleString('es-CL')}`;
-                    status.style.display = 'block';
-                    
-                    alert(`Datos cargados desde Google Sheets (${currentMonth})`);
+                    const statusText = document.getElementById('syncStatusText');
+                    statusText.textContent = `Sincronizado con Google Sheets (${currentMonth}) a las ${new Date().toLocaleTimeString('es-CL')}`;
+                    status.style.display = 'flex';
+                    showToast(`¡Datos cargados con éxito (${currentMonth})!`, 'success');
                 } else {
-                    throw new Error(data.error || 'Error desconocido');
+                    throw new Error(data.error || 'Respuesta inesperada de Google Sheets');
                 }
-            } catch (error) {
-                alert('Error al cargar desde Google Sheets: ' + error.message);
+            } catch (err) {
+                showToast(`Error al cargar: ${err.message}`, 'error');
             }
         }
 
         async function saveToSheets() {
             if (!sheetUrl) {
-                alert('Por favor configura la URL de Google Sheets primero');
+                showToast('Configura primero la URL de Google Apps Script', 'error');
                 toggleConfig();
                 return;
             }
-            
+
             try {
+                showToast('Guardando en Google Sheets...', 'info');
                 const response = await fetch(`${sheetUrl}?action=saveAll&month=${currentMonth}`, {
                     method: 'POST',
                     body: JSON.stringify({
@@ -507,23 +1133,24 @@
                         month: currentMonth
                     })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.success) {
                     const status = document.getElementById('syncStatus');
-                    status.textContent = `✅ Datos guardados en Google Sheets (${currentMonth}) - ${new Date().toLocaleString('es-CL')}`;
-                    status.style.display = 'block';
-                    
-                    alert(`Datos guardados en Google Sheets (${currentMonth})`);
+                    const statusText = document.getElementById('syncStatusText');
+                    statusText.textContent = `Copia guardada en Google Sheets (${currentMonth}) a las ${new Date().toLocaleTimeString('es-CL')}`;
+                    status.style.display = 'flex';
+                    showToast('¡Guardado correctamente en Google Sheets!', 'success');
                 } else {
-                    throw new Error(data.error || 'Error desconocido');
+                    throw new Error(data.error || 'Error al guardar');
                 }
-            } catch (error) {
-                alert('Error al guardar en Google Sheets: ' + error.message);
+            } catch (err) {
+                showToast(`Error al guardar: ${err.message}`, 'error');
             }
         }
 
+        // Backup and Restore
         function exportData() {
             const data = {
                 activeOrders,
@@ -537,6 +1164,7 @@
             a.href = url;
             a.download = `pedidos_${currentMonth}_${new Date().toISOString().split('T')[0]}.json`;
             a.click();
+            showToast('Copia de seguridad descargada');
         }
 
         function importData(event) {
@@ -550,16 +1178,16 @@
                         if (data.deliveredOrders) deliveredOrders = data.deliveredOrders;
                         saveToLocalStorage();
                         renderOrders();
-                        alert('Datos importados correctamente');
-                    } catch (error) {
-                        alert('Error al importar datos: ' + error.message);
+                        showToast('Copia de seguridad restaurada correctamente');
+                    } catch (err) {
+                        showToast('Archivo JSON no válido', 'error');
                     }
                 };
                 reader.readAsText(file);
             }
         }
 
-        // Initialize on load
+        // Window load
         window.onload = init;
     </script>
 </body>
